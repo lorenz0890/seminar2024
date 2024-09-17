@@ -11,7 +11,7 @@ each unique feature vector corresponds to an integer (heterogeneous initializati
 opposed to homgeneous init of 1-WL with node features set to one).
 
 .) training was conducted on 80% random train split with 3 layer GIN/GCN and adam optimizer at lr=0.01 for 20 epochs.
-embeddings were extreacted at the end of each epoch.
+embeddings were extreacted at the end of each epoch (hidden layer dimensions 32).
 
 .) intra cluster cosine similarity: cosine similarity between node embeddings of the same WL color of the graph.
 inter cluster cosine similarity: cosine similarity between nodes of differen WL color of the graph.
