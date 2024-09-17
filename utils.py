@@ -1,8 +1,12 @@
+import itertools
+
 import numpy as np
 import torch
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.manifold import TSNE
+from torch_geometric.nn import WLConv
+from torchmetrics.functional import cosine_similarity
 
 
 def cluster_and_visualize(embeddings, n_clusters=5, filename='clustered_embeddings.png'):
@@ -144,3 +148,63 @@ def prune_model_randomly(model, pruning_percentage):
             param.data = torch.from_numpy(pruned_param_data).to(param.device)
 
             print(f"Pruned {num_to_prune} weights in parameter '{name}'.")
+
+
+def apply_wlconv(embeddings_by_graph, num_iterations=3):
+    """
+    Apply 3 iterations of WLConv on each graph's embeddings.
+    """
+    wl_conv = WLConv()  # WLConv layer from torch_geometric
+    for graph_embeddings in embeddings_by_graph:
+        edge_index = graph_embeddings['edge_index']
+
+        #x = graph_embeddings['x']  # Or use 'x' to start with initial node features
+        x = torch.ones(graph_embeddings['x'].shape[0]).long().to(edge_index.get_device())
+
+        # Apply 3 iterations of WLConv
+        for iteration in range(1, num_iterations+1):
+            x = wl_conv(x, edge_index)  # Update node embeddings using WLConv
+
+            # Store the updated embeddings after WLConv iterations
+            graph_embeddings["wlconv_embeddings_{}".format(iteration)] = x
+
+    return embeddings_by_graph
+
+def compute_intra_inter_cluster_similarity(graph_embeddings, depth=3):
+    """
+    Compute intra-cluster and inter-cluster similarity using WL colors as cluster labels.
+    """
+    wl_colors = graph_embeddings["wlconv_embeddings_{}".format(depth)]
+    node_embeddings = graph_embeddings["conv{}".format(depth)]  # Assume WL colors are stored in x (or wherever the color labels are)
+
+    # Get unique cluster labels (WL colors)
+    unique_labels = torch.unique(wl_colors)
+
+    # Intra-cluster similarity: similarity between embeddings of nodes with the same WL color
+    intra_cluster_similarities = []
+    for label in unique_labels:
+        indices = (wl_colors == label).nonzero(as_tuple=True)[0]  # Indices of nodes with this color
+        if len(indices) > 1:  # Only compute if there's more than one node in the cluster
+            pairs = list(itertools.combinations(indices, 2))  # All pairs within the cluster
+            similarities = [
+                cosine_similarity(node_embeddings[i].unsqueeze(0), node_embeddings[j].unsqueeze(0)).item()
+                for i, j in pairs
+            ]
+            intra_cluster_similarities.extend(similarities)
+
+    intra_cluster_similarity = sum(intra_cluster_similarities) / len(intra_cluster_similarities) if intra_cluster_similarities else 0
+
+    # Inter-cluster similarity: similarity between embeddings of nodes with different WL colors
+    inter_cluster_similarities = []
+    for label_1, label_2 in itertools.combinations(unique_labels, 2):  # All pairs of clusters
+        indices_1 = (wl_colors == label_1).nonzero(as_tuple=True)[0]
+        indices_2 = (wl_colors == label_2).nonzero(as_tuple=True)[0]
+        similarities = [
+            cosine_similarity(node_embeddings[i].unsqueeze(0), node_embeddings[j].unsqueeze(0)).item()
+            for i in indices_1 for j in indices_2
+        ]
+        inter_cluster_similarities.extend(similarities)
+
+    inter_cluster_similarity = sum(inter_cluster_similarities) / len(inter_cluster_similarities) if inter_cluster_similarities else 0
+
+    return intra_cluster_similarity, inter_cluster_similarity
