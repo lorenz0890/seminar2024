@@ -150,6 +150,25 @@ def prune_model_randomly(model, pruning_percentage):
             print(f"Pruned {num_to_prune} weights in parameter '{name}'.")
 
 
+def map_features_to_integers(x):
+    """
+    Maps each unique feature vector in x to a unique integer.
+
+    Args:
+    x (torch.Tensor): A matrix where each row is a node feature vector.
+
+    Returns:
+    torch.Tensor: A vector of integers where each integer represents a unique node feature vector.
+    """
+    # Convert tensor to numpy for easier manipulation
+    x_np = x.cpu().numpy()  # Convert to numpy array if necessary (ensure it's on CPU)
+
+    # Find unique feature vectors and their corresponding indices
+    unique_vectors, inverse_indices = np.unique(x_np, axis=0, return_inverse=True)
+
+    # `inverse_indices` contains the integer mapping for each node's feature vector
+    return torch.tensor(inverse_indices, dtype=torch.long)
+
 def apply_wlconv(embeddings_by_graph, num_iterations=3):
     """
     Apply 3 iterations of WLConv on each graph's embeddings.
@@ -159,7 +178,8 @@ def apply_wlconv(embeddings_by_graph, num_iterations=3):
         edge_index = graph_embeddings['edge_index']
 
         #x = graph_embeddings['x']  # Or use 'x' to start with initial node features
-        x = torch.ones(graph_embeddings['x'].shape[0]).long().to(edge_index.get_device())
+        x = map_features_to_integers(graph_embeddings['x']).long().to(edge_index.get_device()) # Integer encoding for unique feature vectors
+        #x = torch.ones(graph_embeddings['x'].shape[0]).long().to(edge_index.get_device())
 
         # Apply 3 iterations of WLConv
         for iteration in range(1, num_iterations+1):
@@ -207,4 +227,26 @@ def compute_intra_inter_cluster_similarity(graph_embeddings, depth=3):
 
     inter_cluster_similarity = sum(inter_cluster_similarities) / len(inter_cluster_similarities) if inter_cluster_similarities else 0
 
-    return intra_cluster_similarity, inter_cluster_similarity
+    return intra_cluster_similarity, inter_cluster_similarity, unique_labels.shape[0]
+
+# Helper function to replace NaN with None for JSON compatibility
+def replace_nan_with_none(d):
+    """Recursively replace NaN values with None (null in JSON) in a dictionary."""
+    if isinstance(d, dict):
+        return {k: replace_nan_with_none(v) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [replace_nan_with_none(v) for v in d]
+    elif isinstance(d, float) and np.isnan(d):
+        return None
+    return d
+
+# Helper function to replace None (null in JSON) with NaN in the dictionary
+def replace_none_with_nan(d):
+    """Recursively replace None values with NaN in a dictionary."""
+    if isinstance(d, dict):
+        return {k: replace_none_with_nan(v) for k, v in d.items()}
+    elif isinstance(d, list):
+        return [replace_none_with_nan(v) for v in d]
+    elif d is None:
+        return np.nan
+    return d

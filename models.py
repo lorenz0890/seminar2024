@@ -72,7 +72,7 @@ class GCN(torch.nn.Module):
         # Fully connected layers + ReLU
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
-
+        #torch.log_softmax()
         return x
 
 
