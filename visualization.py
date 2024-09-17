@@ -62,6 +62,7 @@ def plot_similarity(results, filename='similarity_with_accuracy_plot.png'):
             inter_cleaned = clean_nans(metrics['inter'])
 
             # Plot intra with solid line
+
             intra_line, = ax1.plot(range(1, len(intra_cleaned) + 1), intra_cleaned,
                                    label=f'Depth (Intra) {depth}', linestyle='-', color=colors[i])
             intra_lines.append(intra_line)
@@ -75,7 +76,7 @@ def plot_similarity(results, filename='similarity_with_accuracy_plot.png'):
     ax1.set_title('Intra- and Inter Cluster Similarity and Test Accuracy over Epochs')
     ax1.set_xlabel('Epoch')
     ax1.set_ylabel('Cosine Similarity')
-    plt.ylim(0.2, 1.1)
+    plt.ylim(0.0, 1.1)
 
     # Plot test accuracy on a secondary y-axis (make sure to use test_acc_epochs)
     ax2 = ax1.twinx()
@@ -96,7 +97,7 @@ def plot_similarity(results, filename='similarity_with_accuracy_plot.png'):
 
     ax1.legend(custom_legend, custom_labels, loc='lower left')
 
-    plt.ylim(0.2,1.1)
+    plt.ylim(0.0,1.1)
     # Save the plot to a file
     plt.tight_layout()
     plt.savefig(filename)
